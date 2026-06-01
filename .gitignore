@@ -1,0 +1,37 @@
+# Secrets — NEVER commit
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.crt
+secrets/
+credentials/
+
+# Registry basic-auth (generado con htpasswd, ver registry/README.md)
+registry/auth/htpasswd
+
+# Local overrides
+docker-compose.override.yml
+*.local.yml
+*.local.yaml
+
+# Build / state
+dist/
+build/
+.terraform/
+*.tfstate
+*.tfstate.backup
+.kube/
+kubeconfig
+
+# OS / IDE
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Logs
+*.log
+logs/

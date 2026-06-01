@@ -1,0 +1,189 @@
+# Recetalia — single-server deploy (ambiente pre-prod)
+#
+# Flow recomendado:
+#   Local:   ./scripts/build-and-push.sh      # build + push al registry
+#   Server:  ./scripts/deploy.sh user@server  # pull + up -d
+#
+# DBs: NO containerizadas. Cada API se conecta a los hosts externos que
+# ya tiene configurados en su `application.yml` (ver recetalia-api-rest
+# → 143.110.212.167, security-api + transversal → DO managed pre-prod).
+# El compose no inyecta env vars de DB — se respeta el yml de cada app.
+#
+# Si más adelante se quiere containerizar, agregar un servicio `mysql`
+# + env vars `SPRING_DATASOURCE_*` / `SPRING_R2DBC_*`.
+
+name: recetalia
+
+networks:
+  recetalia-net:
+    driver: bridge
+
+volumes:
+  registry-data:
+  letsencrypt-data:
+
+services:
+  # =========================================================================
+  # Registry self-hosted (Distribution v2) — expuesto por nginx con TLS.
+  # Auth: htpasswd (file en ./registry/auth/htpasswd, ver registry/README.md).
+  # En el primer bootstrap arrancar sólo `registry nginx` para que nginx
+  # obtenga el cert de Let's Encrypt y el registry quede disponible.
+  # Recién después se hace `docker compose push` desde local y `up -d`.
+  # =========================================================================
+  registry:
+    image: registry:2.8
+    container_name: recetalia-registry
+    restart: unless-stopped
+    environment:
+      REGISTRY_AUTH: htpasswd
+      REGISTRY_AUTH_HTPASSWD_REALM: Recetalia Registry
+      REGISTRY_AUTH_HTPASSWD_PATH: /auth/htpasswd
+      REGISTRY_STORAGE_DELETE_ENABLED: "true"
+    volumes:
+      - registry-data:/var/lib/registry
+      - ./registry/auth:/auth:ro
+    networks:
+      - recetalia-net
+
+  # =========================================================================
+  # APIs (Spring Boot 3.x / Java 21)
+  #
+  # Sin env vars de DB/JWT/SMTP/Twilio: cada app lee su `application.yml`.
+  # El único override es `EXTERNAL_API_TRANSVERSAL_API_RECETALIA` en
+  # security-api, porque en pre-prod transversal es sólo accesible por red
+  # interna docker (no vía internet).
+  # =========================================================================
+  recetalia-api-rest:
+    build:
+      context: ../recetalia-api-rest
+    image: ${REGISTRY_HOST:-localhost}/recetalia/recetalia-api-rest:${IMAGE_TAG:-latest}
+    container_name: recetalia-api-rest
+    restart: unless-stopped
+    environment:
+      # Branch register_medic: application.yml ya apunta a la DO managed pre-prod,
+      # pero declara server.port: 8094. Forzamos 8092 para no tocar fuente ni nginx.
+      SERVER_PORT: 8092
+      # SPRING_DATASOURCE_* overridea igual via relaxed binding (redundante si el
+      # yml del branch ya apunta a pre-prod, pero los dejamos por si cambia).
+      SPRING_DATASOURCE_URL: ${RECETALIA_DB_URL}
+      SPRING_DATASOURCE_USERNAME: ${RECETALIA_DB_USER}
+      SPRING_DATASOURCE_PASSWORD: ${RECETALIA_DB_PASSWORD}
+      SPRING_DNMA_DATASOURCE_URL: ${RECETALIA_DNMA_DB_URL}
+      SPRING_DNMA_DATASOURCE_USERNAME: ${RECETALIA_DNMA_DB_USER}
+      SPRING_DNMA_DATASOURCE_PASSWORD: ${RECETALIA_DNMA_DB_PASSWORD}
+    networks:
+      - recetalia-net
+
+  security-api-recetalia:
+    build:
+      context: ../security-api-recetalia
+    image: ${REGISTRY_HOST:-localhost}/recetalia/security-api-recetalia:${IMAGE_TAG:-latest}
+    container_name: security-api-recetalia
+    restart: unless-stopped
+    environment:
+      # Integración con transversal vía red interna docker (sin TLS, sin subdominio público)
+      EXTERNAL_API_TRANSVERSAL_API_RECETALIA: http://transversal-recetalia-api:8093/api
+    networks:
+      - recetalia-net
+
+  transversal-recetalia-api:
+    build:
+      context: ../transversal-recetalia-api
+    image: ${REGISTRY_HOST:-localhost}/recetalia/transversal-recetalia-api:${IMAGE_TAG:-latest}
+    container_name: transversal-recetalia-api
+    restart: unless-stopped
+    networks:
+      - recetalia-net
+    # ⚠️ Sin `ports:` — este servicio NO se expone al host.
+    # Sólo accesible vía red interna `recetalia-net` (lo consume security-api).
+
+  # =========================================================================
+  # Frontends (Angular SSR / SPA)
+  # =========================================================================
+  # FRONTEND_CONFIGURATION selecciona qué environment.ts se bakea en el build.
+  # Valores válidos (definidos en angular.json de cada app):
+  #   - 'production' → api.recetadigital.uy (environment.ts committed, PROD)
+  #   - 'preprod'    → apipre.recetadigital.uy (environment.preprod.ts)
+  # medical-provider-app usa nombres 'prod'/'preprod'/'local' vía MEDICAL_PROVIDER_ENVIRONMENT.
+  farmacias-recetalia-app:
+    build:
+      context: ../farmacias-recetalia-app
+      args:
+        CONFIGURATION: ${FRONTEND_CONFIGURATION:-production}
+    image: ${REGISTRY_HOST:-localhost}/recetalia/farmacias-recetalia-app:${IMAGE_TAG:-latest}
+    container_name: farmacias-recetalia-app
+    restart: unless-stopped
+    networks:
+      - recetalia-net
+
+  medics-recetalia-app:
+    build:
+      context: ../medics-recetalia-app
+      args:
+        CONFIGURATION: ${FRONTEND_CONFIGURATION:-production}
+    image: ${REGISTRY_HOST:-localhost}/recetalia/medics-recetalia-app:${IMAGE_TAG:-latest}
+    container_name: medics-recetalia-app
+    restart: unless-stopped
+    networks:
+      - recetalia-net
+
+  medical-provider-app:
+    build:
+      context: ../medical-provider-app
+      args:
+        # 'local' | 'prod' | 'preprod' — angular.json usa estos nombres (no standard)
+        ENVIRONMENT: ${MEDICAL_PROVIDER_ENVIRONMENT:-prod}
+    image: ${REGISTRY_HOST:-localhost}/recetalia/medical-provider-app:${IMAGE_TAG:-latest}
+    container_name: medical-provider-app
+    restart: unless-stopped
+    networks:
+      - recetalia-net
+
+  gestion-recetadigital-app:
+    build:
+      context: ../gestion-recetadigital-app
+      args:
+        CONFIGURATION: ${FRONTEND_CONFIGURATION:-production}
+    image: ${REGISTRY_HOST:-localhost}/recetalia/gestion-recetadigital-app:${IMAGE_TAG:-latest}
+    container_name: gestion-recetadigital-app
+    restart: unless-stopped
+    environment:
+      PORT: "4000"
+      NODE_ENV: production
+    networks:
+      - recetalia-net
+
+  # =========================================================================
+  # Reverse proxy público — nginx + certbot con auto-renewal de Let's Encrypt.
+  # La imagen `jonasal/nginx-certbot` parsea los `server_name` de los .conf
+  # en /etc/nginx/user_conf.d/ y obtiene un cert LE por cada uno en el primer
+  # boot. Renueva automáticamente vía cron interno.
+  #
+  # Puerto 80 DEBE quedar accesible desde internet (challenge HTTP-01 de LE).
+  # =========================================================================
+  nginx:
+    image: jonasal/nginx-certbot:6.2.0-nginx1.29.8
+    container_name: recetalia-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      CERTBOT_EMAIL: ${CERTBOT_EMAIL}
+      # 1 = staging de LE (cert no confiable pero sin rate limits). Usar para
+      # validar DNS + bootstrap. Cambiar a 0 cuando todo esté OK.
+      STAGING: ${LETSENCRYPT_STAGING:-0}
+      USE_ECDSA: "1"
+    volumes:
+      - ./nginx/conf.d:/etc/nginx/user_conf.d:ro
+      - letsencrypt-data:/etc/letsencrypt
+    depends_on:
+      - farmacias-recetalia-app
+      - medics-recetalia-app
+      - medical-provider-app
+      - gestion-recetadigital-app
+      - recetalia-api-rest
+      - security-api-recetalia
+      - registry
+    networks:
+      - recetalia-net
