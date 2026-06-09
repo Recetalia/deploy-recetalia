@@ -35,3 +35,6 @@ kubeconfig
 # Logs
 *.log
 logs/
+
+# Credenciales locales (NO commitear)
+CREDENTIALS.local.md
