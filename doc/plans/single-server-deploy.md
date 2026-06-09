@@ -47,25 +47,24 @@ Desplegar los 7 servicios de la plataforma Recetalia en **un único servidor rem
 
 ## DBs externas (no containerizadas)
 
-Cada API se conecta a su host hardcoded en `application.yml`. El compose NO inyecta env vars de DB.
+Los tres servicios apuntan al **mismo cluster DO managed pre-prod** (`recetaliadbpreproduccion-…ondigitalocean.com:25060`). `security-api` y `transversal` lo resuelven desde su `application.yml` (el compose no les inyecta env vars de DB). `recetalia-api-rest` también tiene su `application.yml` apuntando ahí (branch `register_medic`), y **además** el compose le inyecta `SPRING_DATASOURCE_*` / `SPRING_DNMA_DATASOURCE_*` desde `.env` hacia el mismo host (override redundante; ver Decisión #8).
 
-| API | Host | Puerto | User | DBs |
-|---|---|---|---|---|
-| `recetalia-api-rest` | `143.110.212.167` | 3306 | `recetali_receuser` | `recetali_receta`, `recetali_dnma` |
-| `security-api-recetalia` | `recetaliadbpreproduccion-do-user-2735981-0.i.db.ondigitalocean.com` | 25060 | `doadmin` | `securitydb` |
-| `transversal-recetalia-api` | ídem DO managed | 25060 | `doadmin` | `recetali_receta`, `recetali_dnma` |
+| API | Host | Puerto | User | DBs | Config |
+|---|---|---|---|---|---|
+| `recetalia-api-rest` | `recetaliadbpreproduccion-…ondigitalocean.com` (DO managed) | 25060 | `doadmin` | `recetali_receta`, `recetali_dnma` | `application.yml` + override `SPRING_DATASOURCE_*` del compose (`.env`) |
+| `security-api-recetalia` | `recetaliadbpreproduccion-do-user-2735981-0.i.db.ondigitalocean.com` | 25060 | `doadmin` | `securitydb` | `application.yml` (sin env vars) |
+| `transversal-recetalia-api` | ídem DO managed | 25060 | `doadmin` | `recetali_receta`, `recetali_dnma` | `application.yml` (sin env vars) |
 
 ⚠️ **Observaciones:**
-- `recetali_receta` vive en 2 hosts distintos (uno para recetalia-api-rest, otro para transversal). Si tienen datos distintos o drift de schema, hay que unificar en una iteración futura.
-- La IP `134.122.33.247` que el usuario mencionó no aparece en el código — puede ser la IP directa del hostname DO managed (a verificar con `dig` desde el server).
-- El server pre-prod (`138.197.150.98`) tiene que tener conectividad salida a ambos hosts y a los puertos `3306` y `25060`.
+- Los tres comparten el cluster DO managed — no hay segundo host `143.110.212.167` (ese string no aparece en el código). El riesgo previo de "`recetali_receta` en 2 hosts distintos" queda invalidado.
+- El server pre-prod (`138.197.150.98`) tiene que tener conectividad salida al host DO managed por el puerto `25060`.
 
 ## Prerrequisitos del servidor
 
 - OS Ubuntu/Debian 22+ (o RHEL-like).
 - Docker Engine ≥ 24 + Docker Compose v2.
 - Puertos 80 y 443 abiertos entrantes.
-- Puertos 3306 (salida hacia `143.110.212.167`) y 25060 (salida hacia DO managed) accesibles.
+- Puerto 25060 (salida hacia el cluster DO managed pre-prod) accesible.
 - Al menos 4 GB RAM y 20 GB disco libre.
 
 > **Detalle por API de qué DB lee y cómo se resuelve la config**: ver [doc/specs/databases.md](../specs/databases.md). Incluye la verificación pre-deploy del cluster DO managed.
@@ -98,7 +97,7 @@ Cada API se conecta a su host hardcoded en `application.yml`. El compose NO inye
 ### Fase 2 — Preparar el servidor
 
 - [ ] Paso 2.1 — SSH al server `root@138.197.150.98`, validar Docker + Compose v2 instalados.
-- [ ] Paso 2.2 — Validar conectividad desde el server a las DBs externas (`143.110.212.167:3306`, `...ondigitalocean.com:25060`).
+- [ ] Paso 2.2 — Validar conectividad desde el server a la DB externa (`...ondigitalocean.com:25060`, cluster DO managed pre-prod).
 - [ ] Paso 2.3 — Verificar DNS: los 6 subdominios `*pre.recetadigital.uy` resuelven al server.
 - [ ] Paso 2.4 — Crear `/opt/recetalia/deploy-recetalia/` y copiar `deploy-recetalia/` con `./scripts/deploy.sh` (primera vez, sin imágenes aún).
 - [ ] Paso 2.5 — Crear `.env` en el server a partir de `.env.example` (con credenciales del registry).
@@ -154,8 +153,7 @@ Tras el fix de Fase 6 el login devolvía JWT correctamente, pero farmacias y med
 
 | Riesgo | Mitigación |
 |---|---|
-| `recetali_receta` tiene datos distintos en `143.110.212.167` y en DO managed — `recetalia-api-rest` y `transversal-recetalia-api` pueden ver estados inconsistentes | Fuera de alcance de este plan; verificar explícitamente después del primer deploy con queries de conteo |
-| El server pre-prod no tiene salida al puerto 3306 de `143.110.212.167` (si es IP privada o firewall restrictivo) | Validar con `nc -z 143.110.212.167 3306` en Fase 2.2 antes de deployar apps |
+| El server pre-prod no tiene salida al puerto 25060 del cluster DO managed (firewall / trusted sources de la DB) | Validar con `nc -z recetaliadbpreproduccion-do-user-2735981-0.i.db.ondigitalocean.com 25060` en Fase 2.2 antes de deployar apps; agregar el server a las trusted sources de la DB en DO si hace falta |
 | Secretos commiteados en `application.yml` — si el repo se filtra, credenciales reales expuestas | Fuera de alcance (plan de rotación separado); mitigación parcial: repos privados |
 | `authGuard` permite usuarios `INACTIVE` (bug pre-existente) | No se resuelve acá; plan separado |
 | `POST /api/medics` público en `recetalia-api-rest` | No se resuelve acá; plan separado |

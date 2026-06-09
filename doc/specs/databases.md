@@ -6,7 +6,7 @@ Verificación realizada antes del deploy a pre-prod del 2026-05-28. Documenta **
 
 | API | Cluster / host | Puerto | DBs | Usuario | Source de la config |
 |---|---|---|---|---|---|
-| `recetalia-api-rest` | `143.110.212.167` | 3306 | `recetali_receta`, `recetali_dnma` | `recetali_receuser` | Override por env vars en `docker-compose.yml` (`SPRING_DATASOURCE_*`, `SPRING_DNMA_DATASOURCE_*`) desde `.env` del server |
+| `recetalia-api-rest` | `recetaliadbpreproduccion-do-user-2735981-0.i.db.ondigitalocean.com` (DO managed) | 25060 | `recetali_receta`, `recetali_dnma` | `doadmin` | `application.yml` ya apunta a la DO managed; además el `docker-compose.yml` inyecta `SPRING_DATASOURCE_*` / `SPRING_DNMA_DATASOURCE_*` desde `.env` del server (mismo host) |
 | `security-api-recetalia` | `recetaliadbpreproduccion-do-user-2735981-0.i.db.ondigitalocean.com` (DO managed) | 25060 | `securitydb` | `doadmin` | `application.yml` baked en el JAR (no hay env vars override en el bloque del compose) |
 | `transversal-recetalia-api` | ídem DO managed `recetaliadbpreproduccion-…` | 25060 | `recetali_receta`, `recetali_dnma` | `doadmin` | `application.yml` baked en el JAR (no hay env vars override en el bloque del compose) |
 
@@ -34,7 +34,7 @@ Verificación realizada antes del deploy a pre-prod del 2026-05-28. Documenta **
   - `SPRING_DATASOURCE_USERNAME` ← `${RECETALIA_DB_USER}`
   - `SPRING_DATASOURCE_PASSWORD` ← `${RECETALIA_DB_PASSWORD}`
   - `SPRING_DNMA_DATASOURCE_*` ← análogos para la DB DNMA.
-- Estado actual en `.env` del server: los `RECETALIA_DB_URL`/`RECETALIA_DNMA_DB_URL` apuntan al cluster DO managed (mismo que transversal), pero el `application.yml` interno apunta a `143.110.212.167:3306`. **Verificar cuál gana** corriendo `docker exec recetalia-api-rest env | grep -i datasource` después del deploy — Spring Boot da precedencia a env vars sobre `application.yml`, así que debería ganar la del `.env`.
+- Estado actual: el `application.yml` del branch deployado (`register_medic`) ya apunta al cluster DO managed (`recetaliadbpreproduccion-…ondigitalocean.com:25060`, DBs `recetali_receta` y `recetali_dnma`, usuario `doadmin`) — el string `143.110.212.167` no aparece en el código. Los `RECETALIA_DB_URL`/`RECETALIA_DNMA_DB_URL` del `.env` apuntan al mismo host DO managed, así que el override del compose es redundante (apunta a donde ya apuntaría el yml). Spring Boot da precedencia a env vars sobre `application.yml`, de modo que gana el `.env` — pero ambos coinciden. Se puede confirmar con `docker exec recetalia-api-rest env | grep -i datasource` después del deploy.
 
 ## Evidencia de que el cluster DO es pre-prod (no prod)
 
@@ -59,7 +59,7 @@ SELECT pharmacy_id, COUNT(*) FROM dispensation
 
 ## Riesgos abiertos
 
-1. **`recetali_receta` está en 2 hosts distintos** — `143.110.212.167` (usado por `recetalia-api-rest`) y el cluster DO (usado por `transversal-recetalia-api`). Si los datos difieren o el schema drifta, los dos servicios pueden ver estados inconsistentes. Mitigación pendiente: unificar en una iteración futura (ver [single-server-deploy.md](../plans/single-server-deploy.md)).
+1. ~~**`recetali_receta` en 2 hosts distintos**~~ — **invalidado**. Tras verificar contra el código, los tres servicios (`recetalia-api-rest`, `security-api-recetalia`, `transversal-recetalia-api`) usan el **mismo** cluster DO managed pre-prod. `recetalia-api-rest` apunta a la DO managed tanto en su `application.yml` (branch `register_medic`) como en el override del `.env`; no hay un segundo host `143.110.212.167`. Por lo tanto no hay riesgo de estados inconsistentes por dos hosts.
 2. **Credenciales en plain text** en los `application.yml` de cada API y en el `.env` del server. Rotación + secret manager pendiente (plan separado, fuera de alcance del deploy actual).
 3. **`spring.jpa.datasource.read-only: true`** en el `application.yml` de transversal es no-op (transversal usa R2DBC, no JPA). Si en algún momento se quiere garantizar read-only para evitar escrituras accidentales en pre-prod, hay que aplicarlo a nivel del usuario MySQL.
 4. **DNMA datasource con `ssl: false`** en transversal — DO managed normalmente fuerza TLS. Si la conexión falla por TLS, el flag tendría que cambiar a `true` o configurarse `sslMode`. Verificar logs después del deploy.
@@ -73,7 +73,7 @@ ssh root@138.197.150.98 '
   # transversal — debería ver el hostname DO en los logs de R2DBC al arrancar
   docker logs transversal-recetalia-api 2>&1 | grep -iE "r2dbc|connection|database" | head -10
 
-  # recetalia-api-rest — debe haber ganado el override del .env
+  # recetalia-api-rest — env vars del .env (mismo host DO managed que el yml)
   docker exec recetalia-api-rest env | grep -iE "datasource_url|dnma_url"
 
   # security — mismo cluster que transversal

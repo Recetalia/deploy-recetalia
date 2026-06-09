@@ -23,7 +23,7 @@ Todos tienen `Dockerfile` en el root del proyecto. Todos corren SSR vía Node Ex
 
 | Servicio | Spring Boot | Puerto | Persistencia | Dependencias externas |
 |---|---|---|---|---|
-| [recetalia-api-rest](../../../recetalia-api-rest/) | 3.3.0 | (por confirmar en `application.yml`) | MySQL JPA (`ddl-auto=none`, sin Flyway) | DB MySQL |
+| [recetalia-api-rest](../../../recetalia-api-rest/) | 3.3.0 | **8094** (`application.yml`); el compose lo fuerza a **8092** vía `SERVER_PORT` | MySQL JPA (`ddl-auto=none`, sin Flyway) | DB MySQL |
 | [security-api-recetalia](../../../security-api-recetalia/) | 3.3.4 | **8091** | MySQL JPA (Flyway presente pero `enabled: false`) | DB MySQL, transversal-recetalia-api (para emails de reset) |
 | [transversal-recetalia-api](../../../transversal-recetalia-api/) | 3.4.1 | **8093** | MySQL R2DBC × 2 (`recetali_receta`, `recetali_dnma`) | 2 DBs MySQL, Twilio WhatsApp, SMTP |
 
