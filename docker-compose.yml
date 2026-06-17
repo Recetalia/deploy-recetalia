@@ -71,6 +71,9 @@ services:
       SPRING_DNMA_DATASOURCE_URL: ${RECETALIA_DNMA_DB_URL}
       SPRING_DNMA_DATASOURCE_USERNAME: ${RECETALIA_DNMA_DB_USER}
       SPRING_DNMA_DATASOURCE_PASSWORD: ${RECETALIA_DNMA_DB_PASSWORD}
+      # El application.yml apunta el transversal a PROD (api.recetadigital.uy);
+      # en PRE debe hablar con el transversal local del stack.
+      EXTERNAL_API_TRANSVERSAL_API_RECETALIA: http://transversal-recetalia-api:8093/api
     networks:
       - recetalia-net
 
