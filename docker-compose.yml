@@ -76,6 +76,10 @@ services:
       EXTERNAL_API_TRANSVERSAL_API_RECETALIA: http://transversal-recetalia-api:8093/api
     networks:
       - recetalia-net
+    # XML de DNMA: api-rest guarda el archivo aquí y el transversal lo lee.
+    # Bind mount compartido (host dir 777) para que ambos contenedores (non-root) accedan.
+    volumes:
+      - /opt/recetalia/dnma_info:/srv/dnma_info
 
   security-api-recetalia:
     build:
@@ -95,8 +99,15 @@ services:
     image: ${REGISTRY_HOST:-localhost}/recetalia/transversal-recetalia-api:${IMAGE_TAG:-latest}
     container_name: transversal-recetalia-api
     restart: unless-stopped
+    environment:
+      # Pausa entre grupos de tablas al procesar el XML de DNMA. 0 = sin pausa
+      # (el refactor del upsert es determinista; la pausa era para repartir carga).
+      DNMA_PROCESSING_GROUP_DELAY_SECONDS: ${DNMA_GROUP_DELAY_SECONDS:-0}
     networks:
       - recetalia-net
+    # Lee el XML de DNMA que api-rest dejó en el volumen compartido.
+    volumes:
+      - /opt/recetalia/dnma_info:/srv/dnma_info
     # ⚠️ Sin `ports:` — este servicio NO se expone al host.
     # Sólo accesible vía red interna `recetalia-net` (lo consume security-api).
 
