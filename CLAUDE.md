@@ -14,10 +14,20 @@ Stack: **docker-compose v2** sobre un único servidor pre-prod (`138.197.150.98`
 | --- | --- |
 | Build + push de las 7 imágenes al registry | `./scripts/build-and-push.sh` (lee `.env`, hace `docker login` + `docker compose build/push`) |
 | Deploy al server (sync + pull + up) | `./scripts/deploy.sh user@server [/remote/dir]` (default remote dir `/opt/recetalia`) |
-| Levantar el stack manualmente | `docker compose up -d` (en el server, con `.env` y `registry/auth/htpasswd` presentes) |
+| Levantar el stack manualmente (rol full / .98) | `COMPOSE_PROFILES=registry docker compose up -d` |
+| Levantar el stack manualmente (rol app / server nuevo) | `docker compose up -d` (sin registry) |
 | Estado de los servicios | `docker compose ps` |
 
 `docker-compose.yml` define el stack completo: registry + 3 APIs + 4 frontends + nginx. `transversal-recetalia-api` no expone puertos (sólo red interna `recetalia-net`). El `.env` (gitignored) parametriza registry, TLS, configuración de frontends y el override de DB de `recetalia-api-rest`; plantilla en `.env.example`.
+
+### Rol de deploy (`DEPLOY_ROLE`)
+
+Hay dos hosts. El servicio `registry` está detrás de `profiles: ["registry"]` y su bloque nginx vive en `nginx/conf.d/30-registry.conf`:
+
+- **`full`** (default) — host que además hostea el registry (`138.197.150.98`). `deploy.sh` activa `COMPOSE_PROFILES=registry` e incluye `30-registry.conf`. Es el comportamiento histórico.
+- **`app`** — host sólo de apps (server nuevo `159.203.26.217`, candidato a prod). `DEPLOY_ROLE=app ./scripts/deploy.sh root@159.203.26.217`: NO corre registry, excluye `30-registry.conf`, y pullea las imágenes desde `registrypre.recetadigital.uy` (.98).
+
+Detalle de la mudanza `.98 → server nuevo` en [doc/plans/2026-07-02-prod-server-migration.md](doc/plans/2026-07-02-prod-server-migration.md).
 
 ## Architecture
 

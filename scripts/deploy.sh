@@ -13,17 +13,44 @@
 # Uso:
 #   ./scripts/deploy.sh user@server [REMOTE_DIR]
 #   o: DEPLOY_HOST=user@server ./scripts/deploy.sh
+#
+# Rol de deploy (DEPLOY_ROLE, default `full`):
+#   full → host que además hostea el registry (.98). Levanta el servicio
+#          `registry` (COMPOSE_PROFILES=registry) e incluye 30-registry.conf.
+#   app  → host sólo de apps (server nuevo 159.203.26.217). NO corre registry:
+#          excluye 30-registry.conf y no activa el profile. Pullea desde
+#          registrypre.recetadigital.uy (.98).
+#   DEPLOY_ROLE=app ./scripts/deploy.sh root@159.203.26.217
 
 set -euo pipefail
 
 HOST="${1:-${DEPLOY_HOST:-}}"
 REMOTE_DIR="${2:-/opt/recetalia}"
+DEPLOY_ROLE="${DEPLOY_ROLE:-full}"
 
 if [[ -z "$HOST" ]]; then
   echo "ERROR: indicar host como arg1 o vía DEPLOY_HOST"
   echo "  ./scripts/deploy.sh user@server [/remote/dir]"
   exit 1
 fi
+
+case "$DEPLOY_ROLE" in
+  full)
+    COMPOSE_PROFILES_VAL="registry"
+    RSYNC_ROLE_EXCLUDES=()
+    ;;
+  app)
+    COMPOSE_PROFILES_VAL=""
+    # El server de apps no sirve el registry → no mandes su conf (evita que
+    # certbot intente un cert para registrypre, que sigue apuntando a .98).
+    RSYNC_ROLE_EXCLUDES=(--exclude 'nginx/conf.d/30-registry.conf')
+    ;;
+  *)
+    echo "ERROR: DEPLOY_ROLE inválido: '$DEPLOY_ROLE' (usar 'full' o 'app')"
+    exit 1
+    ;;
+esac
+echo "==> Rol de deploy: $DEPLOY_ROLE (COMPOSE_PROFILES='$COMPOSE_PROFILES_VAL')"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DEPLOY_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
@@ -37,7 +64,13 @@ rsync -az --delete \
   --exclude '.git' \
   --exclude '.env' \
   --exclude 'registry/auth/htpasswd' \
+  "${RSYNC_ROLE_EXCLUDES[@]}" \
   "$DEPLOY_DIR/" "$HOST:$REMOTE_DEPLOY/"
+
+# rsync --exclude no borra el archivo si quedó de un deploy previo → borrarlo explícito
+if [[ "$DEPLOY_ROLE" == "app" ]]; then
+  ssh "$HOST" "rm -f '$REMOTE_DEPLOY/nginx/conf.d/30-registry.conf'"
+fi
 
 echo "==> Verificando .env en el server"
 ssh "$HOST" "test -f '$REMOTE_DEPLOY/.env'" || {
@@ -47,12 +80,16 @@ ssh "$HOST" "test -f '$REMOTE_DEPLOY/.env'" || {
   exit 1
 }
 
-echo "==> Verificando registry/auth/htpasswd en el server"
-ssh "$HOST" "test -f '$REMOTE_DEPLOY/registry/auth/htpasswd'" || {
-  echo "ERROR: $REMOTE_DEPLOY/registry/auth/htpasswd no existe."
-  echo "       Generar con las instrucciones de registry/README.md."
-  exit 1
-}
+# htpasswd sólo lo necesita el servicio registry (rol full). El server de apps
+# usa REGISTRY_USER/PASSWORD del .env para `docker login`, no el htpasswd.
+if [[ "$DEPLOY_ROLE" == "full" ]]; then
+  echo "==> Verificando registry/auth/htpasswd en el server"
+  ssh "$HOST" "test -f '$REMOTE_DEPLOY/registry/auth/htpasswd'" || {
+    echo "ERROR: $REMOTE_DEPLOY/registry/auth/htpasswd no existe."
+    echo "       Generar con las instrucciones de registry/README.md."
+    exit 1
+  }
+fi
 
 echo "==> docker login al registry self-hosted (desde el server)"
 # shellcheck disable=SC2029
@@ -61,13 +98,13 @@ ssh "$HOST" "cd '$REMOTE_DEPLOY' && \
   echo \"\$REGISTRY_PASSWORD\" | docker login \"\$REGISTRY_HOST\" -u \"\$REGISTRY_USER\" --password-stdin"
 
 echo "==> docker compose pull"
-ssh "$HOST" "cd '$REMOTE_DEPLOY' && docker compose pull"
+ssh "$HOST" "cd '$REMOTE_DEPLOY' && COMPOSE_PROFILES='$COMPOSE_PROFILES_VAL' docker compose pull"
 
 echo "==> docker compose up -d"
-ssh "$HOST" "cd '$REMOTE_DEPLOY' && docker compose up -d"
+ssh "$HOST" "cd '$REMOTE_DEPLOY' && COMPOSE_PROFILES='$COMPOSE_PROFILES_VAL' docker compose up -d"
 
 echo "==> Estado"
-ssh "$HOST" "cd '$REMOTE_DEPLOY' && docker compose ps"
+ssh "$HOST" "cd '$REMOTE_DEPLOY' && COMPOSE_PROFILES='$COMPOSE_PROFILES_VAL' docker compose ps"
 
 echo
 echo "OK — deploy terminado."

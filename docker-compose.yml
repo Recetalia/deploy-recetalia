@@ -34,6 +34,10 @@ services:
     image: registry:2.8
     container_name: recetalia-registry
     restart: unless-stopped
+    # Sólo se levanta en el host con rol `full` (.98). El server nuevo (rol `app`)
+    # NO corre registry: pullea desde registrypre.recetadigital.uy (.98).
+    # Activar con: COMPOSE_PROFILES=registry (lo hace deploy.sh en rol full).
+    profiles: ["registry"]
     environment:
       REGISTRY_AUTH: htpasswd
       REGISTRY_AUTH_HTPASSWD_REALM: Recetalia Registry
@@ -188,9 +192,17 @@ services:
       # validar DNS + bootstrap. Cambiar a 0 cuando todo esté OK.
       STAGING: ${LETSENCRYPT_STAGING:-0}
       USE_ECDSA: "1"
+      # 1 = jonasal emite certs self-signed locales en vez de pedir a LE. Necesario
+      # para validar por IP ANTES del cutover DNS (el HTTP-01 de LE fallaría porque
+      # el dominio aún resuelve a otro server). Poner 0 (o quitar) al hacer el cutover.
+      USE_LOCAL_CA: ${USE_LOCAL_CA:-0}
     volumes:
       - ./nginx/conf.d:/etc/nginx/user_conf.d:ro
       - letsencrypt-data:/etc/letsencrypt
+    # `registry` NO va en depends_on: es un servicio con profile y depends_on lo
+    # arrastraría aunque el profile esté off. nginx no lo necesita al arrancar
+    # (resuelve backends en runtime vía el `resolver`). En rol full el registry
+    # se levanta igual por COMPOSE_PROFILES=registry.
     depends_on:
       - farmacias-recetalia-app
       - medics-recetalia-app
@@ -198,6 +210,5 @@ services:
       - gestion-recetadigital-app
       - recetalia-api-rest
       - security-api-recetalia
-      - registry
     networks:
       - recetalia-net
