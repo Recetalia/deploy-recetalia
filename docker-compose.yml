@@ -78,6 +78,11 @@ services:
       # El application.yml apunta el transversal a PROD (api.recetadigital.uy);
       # en PRE debe hablar con el transversal local del stack.
       EXTERNAL_API_TRANSVERSAL_API_RECETALIA: http://transversal-recetalia-api:8093/api
+      # El application.yml apunta security-api a la URL pública (apipre…). Desde el
+      # propio server eso es un hairpin que el candado DOCKER-USER (solo IPs de
+      # Cloudflare) bloquea → "Connection timed out" al registrar médicos/farmacias,
+      # y el rollback borraba el alta recién creada. Red interna directa.
+      EXTERNAL_API_SECURITY_API_RECETALIA: http://security-api-recetalia:8091
     networks:
       - recetalia-net
     # XML de DNMA: api-rest guarda el archivo aquí y el transversal lo lee.
