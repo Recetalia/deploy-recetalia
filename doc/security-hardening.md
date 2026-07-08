@@ -12,7 +12,7 @@ Seguridad **de infraestructura/servidor**. La deuda a nivel aplicación/datos (D
 
 | # | Ítem | Detalle |
 |---|---|---|
-| A1 | **Origin cerrado a Cloudflare** | El `.217` acepta 80/443 **solo desde las IPs de CF** (directo por IP → bloqueado). Hecho con la cadena `DOCKER-USER` de iptables (ufw NO sirve para puertos publicados por Docker). Persistente: `cf-origin-lock.service` (systemd, reaplica al boot) + `/usr/local/sbin/cf-origin-lock.sh` + fallback `/etc/cloudflare-ips-v4`. |
+| A1 | **Origin cerrado a Cloudflare** | El `.217` acepta 80/443 **solo desde las IPs de CF** (directo por IP → bloqueado). Hecho con la cadena `DOCKER-USER` de iptables (ufw NO sirve para puertos publicados por Docker). Persistente: `cf-origin-lock.service` (systemd, reaplica al boot) + `/usr/local/sbin/cf-origin-lock.sh` + fallback `/etc/cloudflare-ips-v4`. **Fix 2026-07-07:** el DROP lleva `-i <iface externa>` (eth0) — sin eso también bloqueaba el **egress** de los contenedores a 80/443 (builds sin npm/fonts, hairpin al security-api vía apipre con timeout → rompía el registro de médicos/farmacias, Twilio). El candado aplica SOLO al tráfico entrante desde internet. |
 | A2 | **SSH sin password** | `PasswordAuthentication no` (drop-in `/etc/ssh/sshd_config.d/00-hardening.conf`; el `50-cloud-init.conf` lo ponía en `yes` — se gana por orden). Mata el vector de brute-force (había **7676** intentos fallidos en auth.log). |
 | A3 | **SSH root key-only** | `PermitRootLogin prohibit-password`. Solo la key de Pablo (`pbl.mendez@gmail.com`) autorizada. |
 | A4 | **fail2ban** | Instalado + activo, jail `sshd` (ya baneó IPs de brute-force). |
