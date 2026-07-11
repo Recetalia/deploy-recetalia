@@ -177,6 +177,19 @@ services:
       - recetalia-net
 
   # =========================================================================
+  # Sitio institucional (recetalia.com) — PHP 7.4/Apache, sin DB.
+  # Sirve HTTP interno; el TLS lo termina nginx (igual que los frontends).
+  # =========================================================================
+  recetalia-site:
+    build:
+      context: ../recetalia-site
+    image: ${REGISTRY_HOST:-localhost}/recetalia/recetalia-site:${IMAGE_TAG:-latest}
+    container_name: recetalia-site
+    restart: unless-stopped
+    networks:
+      - recetalia-net
+
+  # =========================================================================
   # Reverse proxy público — nginx + certbot con auto-renewal de Let's Encrypt.
   # La imagen `jonasal/nginx-certbot` parsea los `server_name` de los .conf
   # en /etc/nginx/user_conf.d/ y obtiene un cert LE por cada uno en el primer
@@ -191,6 +204,10 @@ services:
     ports:
       - "80:80"
       - "443:443"
+      # Puerto de validación por IP del sitio institucional (HTTPS con cert
+      # propio). No lo cubre el candado cf-origin-lock (solo 80/443), así que
+      # es accesible directo por IP mientras recetalia.com no apunte al server.
+      - "8443:8443"
     environment:
       CERTBOT_EMAIL: ${CERTBOT_EMAIL}
       # 1 = staging de LE (cert no confiable pero sin rate limits). Usar para
@@ -204,6 +221,8 @@ services:
     volumes:
       - ./nginx/conf.d:/etc/nginx/user_conf.d:ro
       - letsencrypt-data:/etc/letsencrypt
+      # Cert propio (generado por nosotros con openssl) para el sitio institucional.
+      - ./nginx/certs:/etc/nginx/site-certs:ro
     # `registry` NO va en depends_on: es un servicio con profile y depends_on lo
     # arrastraría aunque el profile esté off. nginx no lo necesita al arrancar
     # (resuelve backends en runtime vía el `resolver`). En rol full el registry
@@ -215,5 +234,6 @@ services:
       - gestion-recetadigital-app
       - recetalia-api-rest
       - security-api-recetalia
+      - recetalia-site
     networks:
       - recetalia-net
