@@ -38,3 +38,6 @@ logs/
 
 # Credenciales locales (NO commitear)
 CREDENTIALS.local.md
+
+# Certs del sitio (se generan con scripts/gen-site-cert.sh; la key nunca se commitea)
+nginx/certs/
