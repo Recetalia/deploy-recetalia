@@ -186,6 +186,14 @@ services:
     image: ${REGISTRY_HOST:-localhost}/recetalia/recetalia-site:${IMAGE_TAG:-latest}
     container_name: recetalia-site
     restart: unless-stopped
+    environment:
+      # Credenciales read-only de la DB para farmacias-habilitadas.php (fuera del
+      # código; los valores reales van en el .env gitignoreado del server).
+      SITE_DB_HOST: ${SITE_DB_HOST}
+      SITE_DB_PORT: ${SITE_DB_PORT:-25060}
+      SITE_DB_USER: ${SITE_DB_USER}
+      SITE_DB_PASS: ${SITE_DB_PASS}
+      SITE_DB_NAME: ${SITE_DB_NAME:-recetali_receta}
     networks:
       - recetalia-net
 
