@@ -36,7 +36,8 @@ services:
       - ./mysql/initdb:/docker-entrypoint-initdb.d:ro
     ports:
       # Solo loopback del host: acceso admin por túnel SSH, nunca expuesto.
-      - "127.0.0.1:3306:3306"
+      # 3307 porque el .98 ya tiene un mysqld nativo del host en 3306.
+      - "127.0.0.1:3307:3306"
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-p${DEV_MYSQL_ROOT_PASSWORD}"]
       interval: 10s
