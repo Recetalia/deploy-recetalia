@@ -43,7 +43,14 @@ case "$DEPLOY_ROLE" in
     COMPOSE_PROFILES_VAL=""
     # El server de apps no sirve el registry → no mandes su conf (evita que
     # certbot intente un cert para registrypre, que sigue apuntando a .98).
-    RSYNC_ROLE_EXCLUDES=(--exclude 'nginx/conf.d/30-registry.conf')
+    # Tampoco el ambiente dev (15-dev.conf + compose dev98 + mysql/), que vive
+    # solo en LOCAL (.98).
+    RSYNC_ROLE_EXCLUDES=(
+      --exclude 'nginx/conf.d/30-registry.conf'
+      --exclude 'nginx/conf.d/15-dev.conf'
+      --exclude 'docker-compose.dev98.yml'
+      --exclude 'mysql/'
+    )
     ;;
   *)
     echo "ERROR: DEPLOY_ROLE inválido: '$DEPLOY_ROLE' (usar 'full' o 'app')"
@@ -69,7 +76,7 @@ rsync -az --delete \
 
 # rsync --exclude no borra el archivo si quedó de un deploy previo → borrarlo explícito
 if [[ "$DEPLOY_ROLE" == "app" ]]; then
-  ssh "$HOST" "rm -f '$REMOTE_DEPLOY/nginx/conf.d/30-registry.conf'"
+  ssh "$HOST" "rm -f '$REMOTE_DEPLOY/nginx/conf.d/30-registry.conf' '$REMOTE_DEPLOY/nginx/conf.d/15-dev.conf' '$REMOTE_DEPLOY/docker-compose.dev98.yml'"
 fi
 
 echo "==> Verificando .env en el server"
