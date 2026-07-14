@@ -59,6 +59,12 @@ services:
       SPRING_DNMA_DATASOURCE_PASSWORD: ${DEV_DB_PASSWORD}
       # Emails de registro/validación: SMTP inválido a propósito (dev no manda mails).
       SPRING_MAIL_PASSWORD: dev-invalid
+      # DigitalOcean Monitoring (dashboard Control / infra). Targets = PRODUCCIÓN:
+      # droplet .217 (581853033) + DB cluster preproduccion. Token read-only en el .env.
+      # El application.yml lee estos nombres exactos: monitoring.do.token=${DO_API_TOKEN:}, etc.
+      DO_API_TOKEN: ${DO_API_TOKEN:-}
+      DO_DROPLET_ID: ${DO_DROPLET_ID:-}
+      DO_DB_CLUSTER_UUID: ${DO_DB_CLUSTER_UUID:-}
 
   security-api-recetalia:
     depends_on:
