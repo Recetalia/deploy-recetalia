@@ -18,6 +18,12 @@ networks:
   recetalia-net:
     driver: bridge
 
+# node-exporter: agente de métricas del HOST (Prometheus, read-only) para el
+# monitor de infraestructura del dashboard de Control. Lee /proc /sys / del host
+# (montados ro) y expone :9100/metrics en la red interna. El api-rest lo consume
+# para CPU/RAM/disco/load EN TIEMPO REAL del server donde corre (dev=.98, prod=.217).
+# No se expone al exterior (sin ports:, solo red recetalia-net).
+
 volumes:
   registry-data:
   letsencrypt-data:
@@ -30,6 +36,22 @@ services:
   # obtenga el cert de Let's Encrypt y el registry quede disponible.
   # Recién después se hace `docker compose push` desde local y `up -d`.
   # =========================================================================
+  node-exporter:
+    image: prom/node-exporter:v1.8.2
+    container_name: recetalia-node-exporter
+    restart: unless-stopped
+    command:
+      - '--path.procfs=/host/proc'
+      - '--path.sysfs=/host/sys'
+      - '--path.rootfs=/rootfs'
+      - '--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc|rootfs/var/lib/docker)($$|/)'
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    networks:
+      - recetalia-net
+
   registry:
     image: registry:2.8
     container_name: recetalia-registry

@@ -1,0 +1,99 @@
+# Recetalia — overrides del AMBIENTE DE DESARROLLO en el server "Local" (.98).
+#
+# Este archivo NO se auto-carga: compose solo lo aplica si COMPOSE_FILE lo
+# incluye. En el .98 eso se activa vía la línea
+#   COMPOSE_FILE=docker-compose.yml:docker-compose.dev98.yml
+# en el .env del server (deploy.sh nunca pisa el .env, así que sobrevive
+# deploys). El server de prod (.217) no tiene esa línea → nunca lo carga.
+#
+# Qué hace:
+#   1. Agrega una MySQL 8 local (schemas recetali_receta / recetali_dnma /
+#      securitydb) — dev queda 100% desacoplado de la DB productiva de DO.
+#   2. Repunta las 3 APIs a esa MySQL local vía env (relaxed binding pisa los
+#      application.yml horneados en las imágenes).
+#   3. Seguridad anti-notificaciones: schedulers del transversal deshabilitados
+#      (cron "-") + credenciales Twilio/SMTP inválidas. Los datos son copia de
+#      prod: pacientes REALES — jamás debe salir un WhatsApp/email desde acá.
+
+volumes:
+  mysql-data:
+
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: recetalia-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DEV_MYSQL_ROOT_PASSWORD}
+      # Usuario de aplicación (los grants por schema los da initdb/01-schemas.sql)
+      DEV_DB_USER: ${DEV_DB_USER}
+      DEV_DB_PASSWORD: ${DEV_DB_PASSWORD}
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - ./mysql/initdb:/docker-entrypoint-initdb.d:ro
+    ports:
+      # Solo loopback del host: acceso admin por túnel SSH, nunca expuesto.
+      # 3307 porque el .98 ya tiene un mysqld nativo del host en 3306.
+      - "127.0.0.1:3307:3306"
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-p${DEV_MYSQL_ROOT_PASSWORD}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - recetalia-net
+
+  recetalia-api-rest:
+    depends_on:
+      mysql:
+        condition: service_healthy
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/recetali_receta
+      SPRING_DATASOURCE_USERNAME: ${DEV_DB_USER}
+      SPRING_DATASOURCE_PASSWORD: ${DEV_DB_PASSWORD}
+      SPRING_DNMA_DATASOURCE_URL: jdbc:mysql://mysql:3306/recetali_dnma
+      SPRING_DNMA_DATASOURCE_USERNAME: ${DEV_DB_USER}
+      SPRING_DNMA_DATASOURCE_PASSWORD: ${DEV_DB_PASSWORD}
+      # Emails de registro/validación: SMTP inválido a propósito (dev no manda mails).
+      SPRING_MAIL_PASSWORD: dev-invalid
+      # DigitalOcean Monitoring (dashboard Control / infra). Targets = PRODUCCIÓN:
+      # droplet .217 (581853033) + DB cluster preproduccion. Token read-only en el .env.
+      # El application.yml lee estos nombres exactos: monitoring.do.token=${DO_API_TOKEN:}, etc.
+      DO_API_TOKEN: ${DO_API_TOKEN:-}
+      DO_DROPLET_ID: ${DO_DROPLET_ID:-}
+      DO_DB_CLUSTER_UUID: ${DO_DB_CLUSTER_UUID:-}
+
+  security-api-recetalia:
+    depends_on:
+      mysql:
+        condition: service_healthy
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/securitydb
+      SPRING_DATASOURCE_USERNAME: ${DEV_DB_USER}
+      SPRING_DATASOURCE_PASSWORD: ${DEV_DB_PASSWORD}
+
+  transversal-recetalia-api:
+    depends_on:
+      mysql:
+        condition: service_healthy
+    environment:
+      SPRING_R2DBC_URL: r2dbc:mysql://mysql:3306/recetali_receta
+      SPRING_R2DBC_USERNAME: ${DEV_DB_USER}
+      SPRING_R2DBC_PASSWORD: ${DEV_DB_PASSWORD}
+      DNMA_DATASOURCE_URL: r2dbc:mysql://mysql:3306/recetali_dnma
+      DNMA_DATASOURCE_USERNAME: ${DEV_DB_USER}
+      DNMA_DATASOURCE_PASSWORD: ${DEV_DB_PASSWORD}
+      DNMA_DATASOURCE_SSL: "false"
+      # Schedulers OFF (cron "-" = deshabilitado en Spring). Mismo mecanismo
+      # validado en el override systemd del .67. Se cubren las dos variantes
+      # de relaxed binding para available-reminders.
+      SCHEDULER_PRESCRIPTIONS_PENDING: "-"
+      SCHEDULER_PRESCRIPTIONS_AVAILABLE_REMINDERS: "-"
+      SCHEDULER_PRESCRIPTIONS_AVAILABLEREMINDERS: "-"
+      SCHEDULER_PRESCRIPTIONS_EXPIRED: "-"
+      # Twilio/SMTP neutralizados: aunque algo dispare, la credencial no sirve.
+      TWILIO_AUTH_TOKEN: dev-invalid
+      EMAIL_PASSWORD: dev-invalid
