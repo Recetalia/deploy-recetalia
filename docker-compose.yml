@@ -105,6 +105,12 @@ services:
       # Cloudflare) bloquea → "Connection timed out" al registrar médicos/farmacias,
       # y el rollback borraba el alta recién creada. Red interna directa.
       EXTERNAL_API_SECURITY_API_RECETALIA: http://security-api-recetalia:8091
+      # Dashboard de Control — DigitalOcean Monitoring (card de la DB managed).
+      # application.yml lee estos nombres exactos (monitoring.do.token=${DO_API_TOKEN:}, etc.).
+      # Sin token el dashboard degrada limpio a "sin datos".
+      DO_API_TOKEN: ${DO_API_TOKEN:-}
+      DO_DROPLET_ID: ${DO_DROPLET_ID:-}
+      DO_DB_CLUSTER_UUID: ${DO_DB_CLUSTER_UUID:-}
     networks:
       - recetalia-net
     # XML de DNMA: api-rest guarda el archivo aquí y el transversal lo lee.
