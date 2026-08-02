@@ -147,6 +147,15 @@ services:
       # Pausa entre grupos de tablas al procesar el XML de DNMA. 0 = sin pausa
       # (el refactor del upsert es determinista; la pausa era para repartir carga).
       DNMA_PROCESSING_GROUP_DELAY_SECONDS: ${DNMA_GROUP_DELAY_SECONDS:-0}
+      # DBs obligatorias: el application.yml ya NO trae las bases hardcodeadas, sus
+      # defaults son localhost. Mismo criterio que security-api: `:?` para que falte
+      # ruidosamente en el `compose up` y no en producción.
+      SPRING_R2DBC_URL: ${TRANSVERSAL_DB_URL:?falta TRANSVERSAL_DB_URL en el .env}
+      SPRING_R2DBC_USERNAME: ${TRANSVERSAL_DB_USER:?falta TRANSVERSAL_DB_USER en el .env}
+      SPRING_R2DBC_PASSWORD: ${TRANSVERSAL_DB_PASSWORD:?falta TRANSVERSAL_DB_PASSWORD en el .env}
+      DNMA_DATASOURCE_URL: ${TRANSVERSAL_DNMA_DB_URL:?falta TRANSVERSAL_DNMA_DB_URL en el .env}
+      DNMA_DATASOURCE_USERNAME: ${TRANSVERSAL_DNMA_DB_USER:?falta TRANSVERSAL_DNMA_DB_USER en el .env}
+      DNMA_DATASOURCE_PASSWORD: ${TRANSVERSAL_DNMA_DB_PASSWORD:?falta TRANSVERSAL_DNMA_DB_PASSWORD en el .env}
     networks:
       - recetalia-net
     # Lee el XML de DNMA que api-rest dejó en el volumen compartido.
