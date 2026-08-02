@@ -127,6 +127,13 @@ services:
     environment:
       # Integración con transversal vía red interna docker (sin TLS, sin subdominio público)
       EXTERNAL_API_TRANSVERSAL_API_RECETALIA: http://transversal-recetalia-api:8093/api
+      # DB obligatoria. El application.yml ya NO trae la base hardcodeada: su default es
+      # localhost, así que sin estas variables el servicio arrancaría contra un MySQL
+      # inexistente y nadie podría loguear. El `:?` aborta el `compose up` con un mensaje
+      # claro en vez de dejar que se descubra en producción.
+      SPRING_DATASOURCE_URL: ${SECURITY_DB_URL:?falta SECURITY_DB_URL en el .env}
+      SPRING_DATASOURCE_USERNAME: ${SECURITY_DB_USER:?falta SECURITY_DB_USER en el .env}
+      SPRING_DATASOURCE_PASSWORD: ${SECURITY_DB_PASSWORD:?falta SECURITY_DB_PASSWORD en el .env}
     networks:
       - recetalia-net
 
