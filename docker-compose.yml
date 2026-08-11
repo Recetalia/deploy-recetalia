@@ -220,6 +220,20 @@ services:
     networks:
       - recetalia-net
 
+  # App del Químico Farmacéutico (regente / D.T.). Angular estático servido por el
+  # nginx interno del contenedor; el recetalia-nginx termina TLS.
+  # PROD: qf.recetalia.com (51-prod-qf.conf) · PRE/DEV: qfpre.* (11-qf.conf).
+  qf-recetalia-app:
+    build:
+      context: ../qf-recetalia-app
+      args:
+        CONFIGURATION: ${FRONTEND_CONFIGURATION:-production}
+    image: ${REGISTRY_HOST:-localhost}/recetalia/qf-recetalia-app:${IMAGE_TAG:-latest}
+    container_name: qf-recetalia-app
+    restart: unless-stopped
+    networks:
+      - recetalia-net
+
   # =========================================================================
   # Sitio institucional (recetalia.com) — PHP 7.4/Apache, sin DB.
   # Sirve HTTP interno; el TLS lo termina nginx (igual que los frontends).
@@ -284,6 +298,7 @@ services:
       - medics-recetalia-app
       - medical-provider-app
       - gestion-recetadigital-app
+      - qf-recetalia-app
       - recetalia-api-rest
       - security-api-recetalia
       - recetalia-site

@@ -44,10 +44,13 @@ case "$DEPLOY_ROLE" in
     # El server de apps no sirve el registry → no mandes su conf (evita que
     # certbot intente un cert para registrypre, que sigue apuntando a .98).
     # Tampoco el ambiente dev (15-dev.conf + compose dev98 + mysql/), que vive
-    # solo en LOCAL (.98).
+    # solo en LOCAL (.98), ni 11-qf.conf: sus server_name son qfpre.* y resuelven
+    # al .98, así que certbot pediría certs que no puede validar desde acá. En prod
+    # la app QF se sirve por 51-prod-qf.conf (qf.recetalia.com, cert propio).
     RSYNC_ROLE_EXCLUDES=(
       --exclude 'nginx/conf.d/30-registry.conf'
       --exclude 'nginx/conf.d/15-dev.conf'
+      --exclude 'nginx/conf.d/11-qf.conf'
       --exclude 'docker-compose.dev98.yml'
       --exclude 'mysql/'
     )
@@ -76,7 +79,7 @@ rsync -az --delete \
 
 # rsync --exclude no borra el archivo si quedó de un deploy previo → borrarlo explícito
 if [[ "$DEPLOY_ROLE" == "app" ]]; then
-  ssh "$HOST" "rm -f '$REMOTE_DEPLOY/nginx/conf.d/30-registry.conf' '$REMOTE_DEPLOY/nginx/conf.d/15-dev.conf' '$REMOTE_DEPLOY/docker-compose.dev98.yml'"
+  ssh "$HOST" "rm -f '$REMOTE_DEPLOY/nginx/conf.d/30-registry.conf' '$REMOTE_DEPLOY/nginx/conf.d/15-dev.conf' '$REMOTE_DEPLOY/nginx/conf.d/11-qf.conf' '$REMOTE_DEPLOY/docker-compose.dev98.yml'"
 fi
 
 echo "==> Verificando .env en el server"

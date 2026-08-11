@@ -98,16 +98,6 @@ services:
       TWILIO_AUTH_TOKEN: dev-invalid
       EMAIL_PASSWORD: dev-invalid
 
-  # App del Químico Farmacéutico (regente / D.T.). Solo en PRE/.98 por ahora
-  # (dominio qfpre.doctorconsultas.com, DNS-only → .98). Se sirve estática por
-  # nginx interno del contenedor; el recetalia-nginx termina TLS (ver 11-qf.conf).
-  qf-recetalia-app:
-    build:
-      context: ../qf-recetalia-app
-      args:
-        CONFIGURATION: ${FRONTEND_CONFIGURATION:-production}
-    image: ${REGISTRY_HOST:-localhost}/recetalia/qf-recetalia-app:${IMAGE_TAG:-latest}
-    container_name: qf-recetalia-app
-    restart: unless-stopped
-    networks:
-      - recetalia-net
+  # qf-recetalia-app se define en el compose base desde el release 2.2.0 (antes vivía
+  # solo acá, cuando la app existía únicamente en PRE/.98). El vhost sigue partido:
+  # 11-qf.conf sirve qfpre.* y 51-prod-qf.conf sirve qf.recetalia.com.
