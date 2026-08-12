@@ -146,6 +146,42 @@ ssh "$HOST" "cd '$REMOTE_DEPLOY' && COMPOSE_PROFILES='$COMPOSE_PROFILES_VAL' doc
 echo "==> docker compose up -d"
 ssh "$HOST" "cd '$REMOTE_DEPLOY' && COMPOSE_PROFILES='$COMPOSE_PROFILES_VAL' docker compose up -d"
 
+# ---------------------------------------------------------------------------
+# Vhosts nginx NUEVOS: enlazarlos a mano
+# ---------------------------------------------------------------------------
+# `jonasal/nginx-certbot` NO incluye el bind mount: su entrypoint crea, **al arrancar el
+# contenedor**, un symlink por cada archivo de /etc/nginx/user_conf.d/ dentro de
+# /etc/nginx/conf.d/, que es lo que nginx.conf incluye.
+#
+# Consecuencia asimétrica, y por eso muerde: MODIFICAR un .conf existente funciona con un
+# simple reload (el symlink ya apunta al archivo, se lee el contenido nuevo), pero AGREGAR
+# uno nuevo no hace nada — nunca recibe su symlink hasta que el contenedor se reinicie.
+#
+# Y falla en silencio: `nginx -t` pasa (está validando la config vieja, que es correcta),
+# el deploy no da ningún error, y el vhost nuevo simplemente no existe. Nos pasó con
+# 51-prod-qf.conf en el deploy de 2.2.0 (2026-08-12): la app quedó corriendo y sana, pero
+# su dominio no resolvía a nada.
+#
+# Se crea el symlink en vez de reiniciar el contenedor porque un restart de nginx corta
+# TODOS los sitios; el symlink + reload es sin downtime. Es efímero (se pierde si el
+# contenedor se recrea), pero eso no importa: al recrearse, el entrypoint los rehace todos.
+echo "==> Enlazando vhosts nginx nuevos (si los hay)"
+ssh "$HOST" "docker exec recetalia-nginx sh -c '
+  nuevos=\"\"
+  for f in /etc/nginx/user_conf.d/*.conf; do
+    b=\$(basename \"\$f\")
+    if [ ! -e \"/etc/nginx/conf.d/\$b\" ]; then
+      ln -sf \"\$f\" \"/etc/nginx/conf.d/\$b\" && nuevos=\"\$nuevos \$b\"
+    fi
+  done
+  if [ -n \"\$nuevos\" ]; then
+    echo \"    nuevos:\$nuevos\"
+    nginx -t && nginx -s reload && echo \"    nginx recargado\"
+  else
+    echo \"    sin vhosts nuevos\"
+  fi
+'" || echo "    (nginx no está corriendo todavía; se enlazarán solos al arrancar)"
+
 echo "==> Estado"
 ssh "$HOST" "cd '$REMOTE_DEPLOY' && COMPOSE_PROFILES='$COMPOSE_PROFILES_VAL' docker compose ps"
 
