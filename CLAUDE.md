@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Proyecto de deploy (infra/DevOps) para la plataforma Recetalia. Orquesta el despliegue de 7 servicios (4 Angular SSR + 3 Spring Boot APIs) que viven en repos hermanos del workspace [../](..).
+Proyecto de deploy (infra/DevOps) para la plataforma Recetalia. Orquesta el despliegue de 8 servicios (4 Angular SSR + 1 Angular estático + 3 Spring Boot APIs) que viven en repos hermanos del workspace [../](..).
 
 Stack: **docker-compose v2** sobre un único servidor pre-prod (`138.197.150.98`, DigitalOcean), con un registry self-hosted (`registry:2.8`) y nginx + Let's Encrypt automático (`jonasal/nginx-certbot`) como reverse proxy público. El flujo es **build local → push al registry → pull + up en el server**. Un deploy a pre-prod ya fue ejecutado y validado (login end-to-end desde browser, 2026-04-22). Detalle en [doc/plans/single-server-deploy.md](doc/plans/single-server-deploy.md).
 
@@ -12,13 +12,15 @@ Stack: **docker-compose v2** sobre un único servidor pre-prod (`138.197.150.98`
 
 | Tarea | Comando |
 | --- | --- |
-| Build + push de las 7 imágenes al registry | `./scripts/build-and-push.sh` (lee `.env`, hace `docker login` + `docker compose build/push`) |
+| Build + push de las 8 imágenes al registry | `./scripts/build-and-push.sh` (lee `.env`, hace `docker login` + `docker compose build/push`) |
 | Deploy al server (sync + pull + up) | `./scripts/deploy.sh user@server [/remote/dir]` (default remote dir `/opt/recetalia`) |
 | Levantar el stack manualmente (rol full / .98) | `COMPOSE_PROFILES=registry docker compose up -d` |
 | Levantar el stack manualmente (rol app / server nuevo) | `docker compose up -d` (sin registry) |
 | Estado de los servicios | `docker compose ps` |
 
-`docker-compose.yml` define el stack completo: registry + 3 APIs + 4 frontends + nginx. `transversal-recetalia-api` no expone puertos (sólo red interna `recetalia-net`). El `.env` (gitignored) parametriza registry, TLS, configuración de frontends y el override de DB de `recetalia-api-rest`; plantilla en `.env.example`.
+`docker-compose.yml` define el stack completo: registry + 3 APIs + 5 frontends + sitio institucional + nginx. `transversal-recetalia-api` no expone puertos (sólo red interna `recetalia-net`). El `.env` (gitignored) parametriza registry, TLS, configuración de frontends y **las bases de las 3 APIs**; plantilla en `.env.example`.
+
+🚨 **El compose va SIEMPRE junto con las APIs.** Desde 2026-08-02 ninguna de las 3 trae la base en su `application.yml` (default = localhost): la inyecta el compose desde el `.env`, con `:?` para abortar el `up` si falta la variable. Rsyncar una API sin el compose actualizado la deja apuntando a un MySQL inexistente.
 
 ### Rol de deploy (`DEPLOY_ROLE`)
 
@@ -41,6 +43,7 @@ Listado completo en [doc/specs/services.md](doc/specs/services.md). Resumen:
 | medics-recetalia-app | Frontend SSR | 4000 / 80 | Idem |
 | medical-provider-app | Frontend SSR | 4000 / 80 | Idem |
 | gestion-recetadigital-app | Frontend SSR | 4000 / 80 | Idem |
+| qf-recetalia-app | Frontend | 80 (nginx) | Angular estático (sin SSR). PROD `qf.recetalia.com` (`51-prod-qf.conf`) · PRE/DEV `qfpre.*` (`11-qf.conf`, excluido del rol `app`) |
 | recetalia-api-rest | Spring Boot | 8094 (yml); compose lo fuerza a 8092 vía `SERVER_PORT` | MySQL JPA |
 | security-api-recetalia | Spring Boot | 8091 | MySQL JPA |
 | transversal-recetalia-api | Spring Boot WebFlux | 8093 | MySQL R2DBC × 2 + Twilio + SMTP |

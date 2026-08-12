@@ -44,10 +44,13 @@ case "$DEPLOY_ROLE" in
     # El server de apps no sirve el registry → no mandes su conf (evita que
     # certbot intente un cert para registrypre, que sigue apuntando a .98).
     # Tampoco el ambiente dev (15-dev.conf + compose dev98 + mysql/), que vive
-    # solo en LOCAL (.98).
+    # solo en LOCAL (.98), ni 11-qf.conf: sus server_name son qfpre.* y resuelven
+    # al .98, así que certbot pediría certs que no puede validar desde acá. En prod
+    # la app QF se sirve por 51-prod-qf.conf (qf.recetalia.com, cert propio).
     RSYNC_ROLE_EXCLUDES=(
       --exclude 'nginx/conf.d/30-registry.conf'
       --exclude 'nginx/conf.d/15-dev.conf'
+      --exclude 'nginx/conf.d/11-qf.conf'
       --exclude 'docker-compose.dev98.yml'
       --exclude 'mysql/'
     )
@@ -66,17 +69,50 @@ REMOTE_DEPLOY="$REMOTE_DIR/deploy-recetalia"
 echo "==> Preparando $REMOTE_DEPLOY en $HOST"
 ssh "$HOST" "mkdir -p '$REMOTE_DEPLOY'"
 
+# El server acumula estado que el repo no conoce, y `--delete` lo borra sin avisar.
+# Medido con un dry-run contra el .98 el 2026-08-10: iba a borrar 14 archivos, TODOS
+# valiosos — los 5 backups del .env (incluido el que es la red de seguridad si el deploy
+# rompe el stack), los 4 dumps de MySQL, un backup viejo de conf.d, y los dos vhosts de
+# doctorconsultas/doctorsuite, que sirven 13 hostnames de OTRO producto detrás del mismo
+# nginx. Se mantiene `--delete` (si no, un .conf renombrado queda vivo y nginx lo sigue
+# sirviendo), pero con estas exclusiones y con el aviso de más abajo.
+RSYNC_KEEP_EXCLUDES=(
+  --exclude '.git'
+  --exclude '.env'            # + los .env.bak-*, por el patrón de abajo
+  --exclude '.env.bak*'
+  --exclude 'registry/auth/htpasswd'
+  --exclude 'mysql/dump_*'    # dumps hechos en el server; `mysql/initdb/` sí se sincroniza
+  --exclude '*.bak-*'         # nginx/conf.d.bak-YYYY-MM-DD y similares
+  # Vhosts de otros productos que comparten este nginx. No viven en este repo.
+  --exclude 'nginx/conf.d/40-doctorconsultas.conf'
+  --exclude 'nginx/conf.d/40-doctorsuite.conf'
+)
+
 echo "==> Sincronizando deploy-recetalia (compose, nginx, scripts)"
+
+# Preview de borrados. Cualquier cosa que aparezca acá y no se esperara es una señal de
+# que el server tiene estado nuevo que el repo no conoce: frenar y mirarlo.
+DELETIONS="$(rsync -az --delete --dry-run --itemize-changes \
+  "${RSYNC_KEEP_EXCLUDES[@]}" "${RSYNC_ROLE_EXCLUDES[@]}" \
+  "$DEPLOY_DIR/" "$HOST:$REMOTE_DEPLOY/" | grep '^\*deleting' || true)"
+
+if [[ -n "$DELETIONS" ]]; then
+  echo "⚠️  El rsync va a BORRAR estos archivos del server:"
+  echo "$DELETIONS" | sed 's/^\*deleting  */    /'
+  if [[ "${DEPLOY_ASSUME_YES:-0}" != "1" ]]; then
+    read -r -p "    ¿Seguir? (escribir 'si') " answer
+    [[ "$answer" == "si" ]] || { echo "Abortado."; exit 1; }
+  fi
+fi
+
 rsync -az --delete \
-  --exclude '.git' \
-  --exclude '.env' \
-  --exclude 'registry/auth/htpasswd' \
+  "${RSYNC_KEEP_EXCLUDES[@]}" \
   "${RSYNC_ROLE_EXCLUDES[@]}" \
   "$DEPLOY_DIR/" "$HOST:$REMOTE_DEPLOY/"
 
 # rsync --exclude no borra el archivo si quedó de un deploy previo → borrarlo explícito
 if [[ "$DEPLOY_ROLE" == "app" ]]; then
-  ssh "$HOST" "rm -f '$REMOTE_DEPLOY/nginx/conf.d/30-registry.conf' '$REMOTE_DEPLOY/nginx/conf.d/15-dev.conf' '$REMOTE_DEPLOY/docker-compose.dev98.yml'"
+  ssh "$HOST" "rm -f '$REMOTE_DEPLOY/nginx/conf.d/30-registry.conf' '$REMOTE_DEPLOY/nginx/conf.d/15-dev.conf' '$REMOTE_DEPLOY/nginx/conf.d/11-qf.conf' '$REMOTE_DEPLOY/docker-compose.dev98.yml'"
 fi
 
 echo "==> Verificando .env en el server"

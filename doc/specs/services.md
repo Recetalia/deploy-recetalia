@@ -12,6 +12,7 @@ Todos tienen `Dockerfile` en el root del proyecto. Todos corren SSR vía Node Ex
 | [medics-recetalia-app](../../../medics-recetalia-app/) | 18.2 | `Dockerfile` | `default.conf` | `production`, `development` | Idem |
 | [medical-provider-app](../../../medical-provider-app/) | 18.1 | `Dockerfile` | `default.conf` | `local`, `prod` (no estándar) | Idem |
 | [gestion-recetadigital-app](../../../gestion-recetadigital-app/) | 18.2 | `Dockerfile` | — | `production`, `development` | Idem |
+| [qf-recetalia-app](../../../qf-recetalia-app/) | 18.2 | `Dockerfile` | `default.conf` | `production`, `preprod`, `development`, `dev` | Idem |
 
 ### Observaciones frontend
 

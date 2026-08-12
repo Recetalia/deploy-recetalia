@@ -97,3 +97,7 @@ services:
       # Twilio/SMTP neutralizados: aunque algo dispare, la credencial no sirve.
       TWILIO_AUTH_TOKEN: dev-invalid
       EMAIL_PASSWORD: dev-invalid
+
+  # qf-recetalia-app se define en el compose base desde el release 2.2.0 (antes vivía
+  # solo acá, cuando la app existía únicamente en PRE/.98). El vhost sigue partido:
+  # 11-qf.conf sirve qfpre.* y 51-prod-qf.conf sirve qf.recetalia.com.

@@ -127,6 +127,13 @@ services:
     environment:
       # Integración con transversal vía red interna docker (sin TLS, sin subdominio público)
       EXTERNAL_API_TRANSVERSAL_API_RECETALIA: http://transversal-recetalia-api:8093/api
+      # DB obligatoria. El application.yml ya NO trae la base hardcodeada: su default es
+      # localhost, así que sin estas variables el servicio arrancaría contra un MySQL
+      # inexistente y nadie podría loguear. El `:?` aborta el `compose up` con un mensaje
+      # claro en vez de dejar que se descubra en producción.
+      SPRING_DATASOURCE_URL: ${SECURITY_DB_URL:?falta SECURITY_DB_URL en el .env}
+      SPRING_DATASOURCE_USERNAME: ${SECURITY_DB_USER:?falta SECURITY_DB_USER en el .env}
+      SPRING_DATASOURCE_PASSWORD: ${SECURITY_DB_PASSWORD:?falta SECURITY_DB_PASSWORD en el .env}
     networks:
       - recetalia-net
 
@@ -140,6 +147,15 @@ services:
       # Pausa entre grupos de tablas al procesar el XML de DNMA. 0 = sin pausa
       # (el refactor del upsert es determinista; la pausa era para repartir carga).
       DNMA_PROCESSING_GROUP_DELAY_SECONDS: ${DNMA_GROUP_DELAY_SECONDS:-0}
+      # DBs obligatorias: el application.yml ya NO trae las bases hardcodeadas, sus
+      # defaults son localhost. Mismo criterio que security-api: `:?` para que falte
+      # ruidosamente en el `compose up` y no en producción.
+      SPRING_R2DBC_URL: ${TRANSVERSAL_DB_URL:?falta TRANSVERSAL_DB_URL en el .env}
+      SPRING_R2DBC_USERNAME: ${TRANSVERSAL_DB_USER:?falta TRANSVERSAL_DB_USER en el .env}
+      SPRING_R2DBC_PASSWORD: ${TRANSVERSAL_DB_PASSWORD:?falta TRANSVERSAL_DB_PASSWORD en el .env}
+      DNMA_DATASOURCE_URL: ${TRANSVERSAL_DNMA_DB_URL:?falta TRANSVERSAL_DNMA_DB_URL en el .env}
+      DNMA_DATASOURCE_USERNAME: ${TRANSVERSAL_DNMA_DB_USER:?falta TRANSVERSAL_DNMA_DB_USER en el .env}
+      DNMA_DATASOURCE_PASSWORD: ${TRANSVERSAL_DNMA_DB_PASSWORD:?falta TRANSVERSAL_DNMA_DB_PASSWORD en el .env}
     networks:
       - recetalia-net
     # Lee el XML de DNMA que api-rest dejó en el volumen compartido.
@@ -201,6 +217,20 @@ services:
     environment:
       PORT: "4000"
       NODE_ENV: production
+    networks:
+      - recetalia-net
+
+  # App del Químico Farmacéutico (regente / D.T.). Angular estático servido por el
+  # nginx interno del contenedor; el recetalia-nginx termina TLS.
+  # PROD: qf.recetalia.com (51-prod-qf.conf) · PRE/DEV: qfpre.* (11-qf.conf).
+  qf-recetalia-app:
+    build:
+      context: ../qf-recetalia-app
+      args:
+        CONFIGURATION: ${FRONTEND_CONFIGURATION:-production}
+    image: ${REGISTRY_HOST:-localhost}/recetalia/qf-recetalia-app:${IMAGE_TAG:-latest}
+    container_name: qf-recetalia-app
+    restart: unless-stopped
     networks:
       - recetalia-net
 
@@ -268,6 +298,7 @@ services:
       - medics-recetalia-app
       - medical-provider-app
       - gestion-recetadigital-app
+      - qf-recetalia-app
       - recetalia-api-rest
       - security-api-recetalia
       - recetalia-site
