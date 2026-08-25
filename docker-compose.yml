@@ -119,6 +119,10 @@ services:
       # nota hasta que el mail ya salió.
       EMAIL_ALLOWLIST_ENABLED: ${EMAIL_ALLOWLIST_ENABLED:-false}
       EMAIL_ALLOWLIST_RECIPIENTS: ${EMAIL_ALLOWLIST_RECIPIENTS:-}
+      # A dónde apunta el link de invitación del Químico Farmacéutico. Es por ambiente y por
+      # eso NO puede quedar en el application.yml: su default es el dominio de PROD, así que
+      # un PRE sin esta variable le mandaría al químico un link a qf.recetalia.com.
+      QF_REGISTRATION_URL: ${QF_REGISTRATION_URL:-https://qf.recetalia.com/definir-clave}
     networks:
       - recetalia-net
     # XML de DNMA: api-rest guarda el archivo aquí y el transversal lo lee.
