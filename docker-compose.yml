@@ -111,6 +111,18 @@ services:
       DO_API_TOKEN: ${DO_API_TOKEN:-}
       DO_DROPLET_ID: ${DO_DROPLET_ID:-}
       DO_DB_CLUSTER_UUID: ${DO_DB_CLUSTER_UUID:-}
+      # Guard de destinatarios de mail. En PRE/DEV va en true con las casillas nuestras:
+      # los envíos se prueban únicamente contra correos propios, y el disparador es un
+      # flujo de la app (Gestión carga el correo de un QF) que sale solo hacia un
+      # profesional real. En PROD va en false = passthrough, comportamiento de siempre.
+      # Prendido con la lista vacía NO manda nada: el default inseguro es el que no se
+      # nota hasta que el mail ya salió.
+      EMAIL_ALLOWLIST_ENABLED: ${EMAIL_ALLOWLIST_ENABLED:-false}
+      EMAIL_ALLOWLIST_RECIPIENTS: ${EMAIL_ALLOWLIST_RECIPIENTS:-}
+      # A dónde apunta el link de invitación del Químico Farmacéutico. Es por ambiente y por
+      # eso NO puede quedar en el application.yml: su default es el dominio de PROD, así que
+      # un PRE sin esta variable le mandaría al químico un link a qf.recetalia.com.
+      QF_REGISTRATION_URL: ${QF_REGISTRATION_URL:-https://qf.recetalia.com/definir-clave}
     networks:
       - recetalia-net
     # XML de DNMA: api-rest guarda el archivo aquí y el transversal lo lee.
