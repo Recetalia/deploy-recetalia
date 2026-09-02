@@ -18,6 +18,28 @@
 volumes:
   mysql-data:
 
+# Redes de los OTROS productos que conviven en el .98 (APE, DoctorConsultas,
+# DoctorSuite). Las crean sus propios composes; acá sólo se declaran como
+# externas para poder engancharles el nginx.
+#
+# 🚨 POR QUÉ ESTÁN ACÁ Y NO SUELTAS. Hasta el 2026-09-02 estas tres redes se le
+# conectaban al contenedor de nginx **a mano** (`docker network connect`), o sea
+# que eran estado no declarado: cualquier `docker compose up --force-recreate`
+# —una operación de rutina— dejaba el nginx sin ellas y los vhosts de esos tres
+# productos empezaban a devolver **502 `Host not found`**, sin que nada fallara
+# del lado de Recetalia. Pasó exactamente eso ese día. Declaradas acá, el
+# recreate las vuelve a poner solo.
+#
+# Van en este override y NO en el compose base a propósito: el .217 no tiene
+# estas redes, y `external: true` sobre una red inexistente aborta el `up`.
+networks:
+  ape-net:
+    external: true
+  compose_dc-net:
+    external: true
+  doctorsuite-net:
+    external: true
+
 services:
   mysql:
     image: mysql:8.0
@@ -101,3 +123,12 @@ services:
   # qf-recetalia-app se define en el compose base desde el release 2.2.0 (antes vivía
   # solo acá, cuando la app existía únicamente en PRE/.98). El vhost sigue partido:
   # 11-qf.conf sirve qfpre.* y 51-prod-qf.conf sirve qf.recetalia.com.
+
+  # El nginx del .98 es el ingress de los cuatro productos del server, no sólo
+  # de Recetalia: sin estas redes no resuelve `ape-aplicacion-1` y compañía.
+  nginx:
+    networks:
+      - recetalia-net
+      - ape-net
+      - compose_dc-net
+      - doctorsuite-net
