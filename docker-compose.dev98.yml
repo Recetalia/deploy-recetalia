@@ -132,3 +132,16 @@ services:
       - ape-net
       - compose_dc-net
       - doctorsuite-net
+
+  # Sitio institucional en PRE (montado 2026-09-05). El kernel 3.10 del .98 no
+  # tiene getrandom(), que el Apache de php:7.4-apache (bullseye, APR 1.7) exige:
+  # el contenedor entra en loop con "AH00141: Could not initialize random number
+  # generator". La variante buster (APR 1.6) lee /dev/urandom y arranca. PROD
+  # sigue con la imagen default. Las credenciales SITE_DB_* del .env apuntan a
+  # la MySQL de PRE (host `mysql`, usuario recetalia_dev). Se llega por el
+  # vhost 8443 default_server de 40-recetalia-site.conf:
+  # https://138.197.150.98:8443/farmacias-habilitadas.php
+  recetalia-site:
+    build:
+      args:
+        PHP_BASE: php:7.4-apache-buster
