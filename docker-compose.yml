@@ -105,6 +105,11 @@ services:
       # Cloudflare) bloquea → "Connection timed out" al registrar médicos/farmacias,
       # y el rollback borraba el alta recién creada. Red interna directa.
       EXTERNAL_API_SECURITY_API_RECETALIA: http://security-api-recetalia:8091
+      # Consilio (motor de interacciones). Opcional: vacío = el chequeo se omite y la
+      # receta se emite igual. En el .98 el contenedor `consilio` se suma a esta red
+      # (su compose propio en /opt/recetalia/consilio) y se lo alcanza por nombre.
+      EXTERNAL_API_CONSILIO: ${EXTERNAL_API_CONSILIO:-}
+      EXTERNAL_API_CONSILIO_API_KEY: ${EXTERNAL_API_CONSILIO_API_KEY:-}
       # Dashboard de Control — DigitalOcean Monitoring (card de la DB managed).
       # application.yml lee estos nombres exactos (monitoring.do.token=${DO_API_TOKEN:}, etc.).
       # Sin token el dashboard degrada limpio a "sin datos".
