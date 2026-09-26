@@ -86,6 +86,10 @@ RSYNC_KEEP_EXCLUDES=(
   # Vhosts de otros productos que comparten este nginx. No viven en este repo.
   --exclude 'nginx/conf.d/40-doctorconsultas.conf'
   --exclude 'nginx/conf.d/40-doctorsuite.conf'
+  --exclude 'nginx/conf.d/45-medicinainteligente.conf'
+  --exclude 'nginx/conf.d/46-consilio.conf'
+  --exclude 'nginx/conf.d/60-ape.conf'
+  --exclude 'nginx/conf.d/61-braderie.conf'
 )
 
 echo "==> Sincronizando deploy-recetalia (compose, nginx, scripts)"
