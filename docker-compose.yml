@@ -74,10 +74,9 @@ services:
   # =========================================================================
   # APIs (Spring Boot 3.x / Java 21)
   #
-  # Sin env vars de DB/JWT/SMTP/Twilio: cada app lee su `application.yml`.
-  # El único override es `EXTERNAL_API_TRANSVERSAL_API_RECETALIA` en
-  # security-api, porque en pre-prod transversal es sólo accesible por red
-  # interna docker (no vía internet).
+  # Ningún application.yml trae credenciales: DB, JWT, SMTP y Twilio vienen
+  # SIEMPRE del .env vía estas variables. Las obligatorias usan `:?` para que
+  # un .env incompleto aborte el `compose up` en vez de arrancar sin credencial.
   # =========================================================================
   recetalia-api-rest:
     build:
@@ -128,6 +127,8 @@ services:
       # eso NO puede quedar en el application.yml: su default es el dominio de PROD, así que
       # un PRE sin esta variable le mandaría al químico un link a qf.recetalia.com.
       QF_REGISTRATION_URL: ${QF_REGISTRATION_URL:-https://qf.recetalia.com/definir-clave}
+      # Valida los tokens que emite security-api: MISMO valor en los dos servicios.
+      JWT_SECRET: ${JWT_SECRET:?falta JWT_SECRET en el .env}
     networks:
       - recetalia-net
     # XML de DNMA: api-rest guarda el archivo aquí y el transversal lo lee.
@@ -151,6 +152,8 @@ services:
       SPRING_DATASOURCE_URL: ${SECURITY_DB_URL:?falta SECURITY_DB_URL en el .env}
       SPRING_DATASOURCE_USERNAME: ${SECURITY_DB_USER:?falta SECURITY_DB_USER en el .env}
       SPRING_DATASOURCE_PASSWORD: ${SECURITY_DB_PASSWORD:?falta SECURITY_DB_PASSWORD en el .env}
+      # Firma los tokens de toda la plataforma (api-rest los valida con el mismo valor).
+      JWT_SECRET: ${JWT_SECRET:?falta JWT_SECRET en el .env}
     networks:
       - recetalia-net
 
@@ -173,6 +176,10 @@ services:
       DNMA_DATASOURCE_URL: ${TRANSVERSAL_DNMA_DB_URL:?falta TRANSVERSAL_DNMA_DB_URL en el .env}
       DNMA_DATASOURCE_USERNAME: ${TRANSVERSAL_DNMA_DB_USER:?falta TRANSVERSAL_DNMA_DB_USER en el .env}
       DNMA_DATASOURCE_PASSWORD: ${TRANSVERSAL_DNMA_DB_PASSWORD:?falta TRANSVERSAL_DNMA_DB_PASSWORD en el .env}
+      # SMTP (notificaciones@recetalia.com) y Twilio (WhatsApp). Ya no están en el yml.
+      EMAIL_PASSWORD: ${EMAIL_PASSWORD:?falta EMAIL_PASSWORD en el .env}
+      TWILIO_ACCOUNT_SID: ${TWILIO_ACCOUNT_SID:?falta TWILIO_ACCOUNT_SID en el .env}
+      TWILIO_AUTH_TOKEN: ${TWILIO_AUTH_TOKEN:?falta TWILIO_AUTH_TOKEN en el .env}
     networks:
       - recetalia-net
     # Lee el XML de DNMA que api-rest dejó en el volumen compartido.
