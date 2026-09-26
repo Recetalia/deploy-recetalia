@@ -88,6 +88,7 @@ RSYNC_KEEP_EXCLUDES=(
   --exclude 'nginx/conf.d/40-doctorsuite.conf'
   --exclude 'nginx/conf.d/45-medicinainteligente.conf'
   --exclude 'nginx/conf.d/46-consilio.conf'
+  --exclude 'nginx/conf.d/47-consilio-app.conf'
   --exclude 'nginx/conf.d/60-ape.conf'
   --exclude 'nginx/conf.d/61-braderie.conf'
 )
