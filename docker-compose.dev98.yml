@@ -117,6 +117,9 @@ services:
       SCHEDULER_PRESCRIPTIONS_AVAILABLEREMINDERS: "-"
       SCHEDULER_PRESCRIPTIONS_EXPIRED: "-"
       # Twilio/SMTP neutralizados: aunque algo dispare, la credencial no sirve.
+      # (El compose base igual exige estas variables en el .env por su `:?`; en el
+      # .98 alcanza con cualquier valor no vacío, p.ej. dev-invalid.)
+      TWILIO_ACCOUNT_SID: dev-invalid
       TWILIO_AUTH_TOKEN: dev-invalid
       EMAIL_PASSWORD: dev-invalid
 
