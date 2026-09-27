@@ -51,6 +51,8 @@ case "$DEPLOY_ROLE" in
       --exclude 'nginx/conf.d/30-registry.conf'
       --exclude 'nginx/conf.d/15-dev.conf'
       --exclude 'nginx/conf.d/11-qf.conf'
+      # DoctorConsultas PRE: su cert sólo existe en el .98 (medido en el deploy de 2.6.0).
+      --exclude 'nginx/conf.d/70-doctorconsultas-pre.conf'
       --exclude 'docker-compose.dev98.yml'
       --exclude 'mysql/'
     )
@@ -117,7 +119,7 @@ rsync -az --delete \
 
 # rsync --exclude no borra el archivo si quedó de un deploy previo → borrarlo explícito
 if [[ "$DEPLOY_ROLE" == "app" ]]; then
-  ssh "$HOST" "rm -f '$REMOTE_DEPLOY/nginx/conf.d/30-registry.conf' '$REMOTE_DEPLOY/nginx/conf.d/15-dev.conf' '$REMOTE_DEPLOY/nginx/conf.d/11-qf.conf' '$REMOTE_DEPLOY/docker-compose.dev98.yml'"
+  ssh "$HOST" "rm -f '$REMOTE_DEPLOY/nginx/conf.d/30-registry.conf' '$REMOTE_DEPLOY/nginx/conf.d/15-dev.conf' '$REMOTE_DEPLOY/nginx/conf.d/11-qf.conf' '$REMOTE_DEPLOY/nginx/conf.d/70-doctorconsultas-pre.conf' '$REMOTE_DEPLOY/docker-compose.dev98.yml'"
 fi
 
 echo "==> Verificando .env en el server"
@@ -170,9 +172,17 @@ ssh "$HOST" "cd '$REMOTE_DEPLOY' && COMPOSE_PROFILES='$COMPOSE_PROFILES_VAL' doc
 # Se crea el symlink en vez de reiniciar el contenedor porque un restart de nginx corta
 # TODOS los sitios; el symlink + reload es sin downtime. Es efímero (se pierde si el
 # contenedor se recrea), pero eso no importa: al recrearse, el entrypoint los rehace todos.
-echo "==> Enlazando vhosts nginx nuevos (si los hay)"
+# Y al revés: si un .conf se borró (p.ej. los que el rol `app` elimina arriba), su symlink
+# queda colgando y el próximo `nginx -t` falla. Medido en el .217 en el deploy de 2.6.0:
+# 11-qf, 15-dev y 30-registry seguían enlazados. Se borran los symlinks huérfanos acá.
+echo "==> Enlazando vhosts nginx nuevos y quitando huérfanos (si los hay)"
 ssh "$HOST" "docker exec recetalia-nginx sh -c '
   nuevos=\"\"
+  for l in /etc/nginx/conf.d/*.conf; do
+    if [ -L \"\$l\" ] && [ ! -e \"\$l\" ]; then
+      rm -f \"\$l\" && nuevos=\"\$nuevos -\$(basename \"\$l\")\"
+    fi
+  done
   for f in /etc/nginx/user_conf.d/*.conf; do
     b=\$(basename \"\$f\")
     if [ ! -e \"/etc/nginx/conf.d/\$b\" ]; then
@@ -180,7 +190,7 @@ ssh "$HOST" "docker exec recetalia-nginx sh -c '
     fi
   done
   if [ -n \"\$nuevos\" ]; then
-    echo \"    nuevos:\$nuevos\"
+    echo \"    cambios:\$nuevos\"
     nginx -t && nginx -s reload && echo \"    nginx recargado\"
   else
     echo \"    sin vhosts nuevos\"
