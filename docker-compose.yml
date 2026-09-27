@@ -129,6 +129,10 @@ services:
       QF_REGISTRATION_URL: ${QF_REGISTRATION_URL:-https://qf.recetalia.com/definir-clave}
       # Valida los tokens que emite security-api: MISMO valor en los dos servicios.
       JWT_SECRET: ${JWT_SECRET:?falta JWT_SECRET en el .env}
+      # Credencial hacia los endpoints server-to-server del security-api (register*,
+      # renew-password*, request-reset-back, users-exist-back). MISMO valor en los dos
+      # servicios y DISTINTO por ambiente. Sin ella las altas y cambios de clave dan 401.
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY:?falta INTERNAL_API_KEY en el .env}
     networks:
       - recetalia-net
     # XML de DNMA: api-rest guarda el archivo aquí y el transversal lo lee.
@@ -154,6 +158,9 @@ services:
       SPRING_DATASOURCE_PASSWORD: ${SECURITY_DB_PASSWORD:?falta SECURITY_DB_PASSWORD en el .env}
       # Firma los tokens de toda la plataforma (api-rest los valida con el mismo valor).
       JWT_SECRET: ${JWT_SECRET:?falta JWT_SECRET en el .env}
+      # Exigida en register*, renew-password*, request-reset-back y users-exist-back
+      # (header X-Internal-Api-Key). Vacía = rechaza todo (fail closed).
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY:?falta INTERNAL_API_KEY en el .env}
     networks:
       - recetalia-net
 
