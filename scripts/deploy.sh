@@ -91,6 +91,11 @@ RSYNC_KEEP_EXCLUDES=(
   --exclude 'nginx/conf.d/45-medicinainteligente.conf'
   --exclude 'nginx/conf.d/46-consilio.conf'
   --exclude 'nginx/conf.d/47-consilio-app.conf'
+  # Preproducción unificada en el .98 (spec doctorhub 2026-10-01): vhosts *.pre.medicinainteligente.ai
+  # que viven sólo en el server, cada uno de su dueño.
+  --exclude 'nginx/conf.d/48-consilio-pre.conf'
+  --exclude 'nginx/conf.d/71-suite-pre.conf'
+  --exclude 'nginx/conf.d/72-pons-pre.conf'
   --exclude 'nginx/conf.d/60-ape.conf'
   --exclude 'nginx/conf.d/61-braderie.conf'
 )
