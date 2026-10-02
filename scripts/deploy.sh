@@ -97,6 +97,7 @@ RSYNC_KEEP_EXCLUDES=(
   --exclude 'nginx/conf.d/49-consiliopre.conf'
   --exclude 'nginx/conf.d/71-suite-pre.conf'
   --exclude 'nginx/conf.d/72-pons-pre.conf'
+  --exclude 'nginx/conf.d/73-suitepre-mi.conf'
   --exclude 'nginx/conf.d/60-ape.conf'
   --exclude 'nginx/conf.d/61-braderie.conf'
 )
