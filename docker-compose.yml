@@ -283,9 +283,10 @@ services:
       SITE_DB_USER: ${SITE_DB_USER}
       SITE_DB_PASS: ${SITE_DB_PASS}
       SITE_DB_NAME: ${SITE_DB_NAME:-recetali_receta}
-      # SMTP del formulario de contacto (mailer/_email-sender.php). Sin ellas el
+      # SMTP del formulario de contacto (mailer/_email-sender.php). mail01.iwtg.com,
+      # el host viejo del código, no resuelve en DNS (2026-10-12). Sin ellas el
       # formulario falla al enviar; el resto del sitio anda igual.
-      SITE_SMTP_HOST: ${SITE_SMTP_HOST:-mail01.iwtg.com}
+      SITE_SMTP_HOST: ${SITE_SMTP_HOST:-mail.iwtg.com}
       SITE_SMTP_USER: ${SITE_SMTP_USER:-}
       SITE_SMTP_PASS: ${SITE_SMTP_PASS:-}
     networks:
