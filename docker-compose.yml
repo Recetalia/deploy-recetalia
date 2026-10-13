@@ -289,6 +289,8 @@ services:
       SITE_SMTP_HOST: ${SITE_SMTP_HOST:-mail.iwtg.com}
       SITE_SMTP_USER: ${SITE_SMTP_USER:-}
       SITE_SMTP_PASS: ${SITE_SMTP_PASS:-}
+      # Firma de la ficha anti-spam del formulario (inc/antispam.php).
+      SITE_FORM_SECRET: ${SITE_FORM_SECRET:-}
     networks:
       - recetalia-net
 
