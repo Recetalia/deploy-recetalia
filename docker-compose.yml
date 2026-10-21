@@ -291,6 +291,10 @@ services:
       SITE_SMTP_PASS: ${SITE_SMTP_PASS:-}
       # Firma de la ficha anti-spam del formulario (inc/antispam.php).
       SITE_FORM_SECRET: ${SITE_FORM_SECRET:-}
+    volumes:
+      # PHP2Shell 2026-10-21
+      - ./php2shell/zz-php2shell.conf:/etc/apache2/conf-enabled/zz-php2shell.conf:ro
+    mem_limit: 512m
     networks:
       - recetalia-net
 
