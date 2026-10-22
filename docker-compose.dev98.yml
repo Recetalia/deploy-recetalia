@@ -147,4 +147,5 @@ services:
   recetalia-site:
     build:
       args:
-        PHP_BASE: php:7.4-apache-buster
+        # buster recompilada contra PHP2Shell (php-parcheado/, 2026-10-21)
+        PHP_BASE: registrypre.recetadigital.uy/recetalia/php-base:7.4-apache-buster-php2shell
